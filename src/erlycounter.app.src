@@ -1,14 +1,13 @@
 %% Copyright
-{application, pinger, [
+{application, erlycounter, [
     {description, ""},
     {vsn, "1"},
     {registered, []},
     {applications, [
         kernel,
         stdlib,
-        inets
+	inets
     ]},
-    {modules, { erlycounter, [ ectable, ecsaver, udp_server ]}},
-    {mod, { config, "ping.conf"}},
+    {modules, { erlycounter, [ udp_server, udp_server_sup ]}},
     {env, []}
 ]}.

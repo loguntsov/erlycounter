@@ -1,63 +1,60 @@
 -module(udp_server).
--export([start_link/2]).
--export([socket_accept/2]).
+-export([init/2, start/2, stop/1, reload/2]).
 
--behavior(gen_server).
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, code_change/3, terminate/2]).
 
 -record(state, {
-	tables :: tuple() % список обслуживаемых супервайзеров
+	linkers :: queue(), % PID-линкеров, которые решают, куда слать данные
+	port :: integer(),
+	socket :: port(),
+	owner_pid :: pid()
 }).
 
-start_link(Socket, Tables) ->
-	gen_server:start_link(?MODULE, {Socket, Sups}, []).
+start(Owner_pid, Port) ->
+	{ok , spawn_link(?MODULE, init, [Owner_pid, Port]) }.
 
-init({Socket, Tables}) ->
-	spawn_link(?MODULE, socket_accept, [self(), Socket]),
-	{ok,#state{tables = Tables}}
-.
+init(Owner_pid, Port) ->
+	{ok, Socket} = gen_udp:open(Port, [ binary, { active, false} ] ),
+	udp_server_sup:event_child_start(Owner_pid),
+	loop(#state{
+		linkers = queue:from_list([ ]),
+		port = Port,
+		socket = Socket,
+		owner_pid = Owner_pid
+	}).
 
-socket_accept(Pid, Socket) ->
-	error_logger:info_report({ udp_server, self()}),
-	error_logger:info_report({proc_info, erlang:process_info(Pid)}),
-	socket_loop(Pid, Socket),
-	end
-.
+loop(State) ->
+	Data = gen_udp:recv(State#state.socket, 0, 100),
+	{ NewState0, Is_exit0 } = do_event(State),
+	{ NewState1, Is_exit1 } = case Data of
+		{ok, { _Address, _Port, Packet } } ->
+			error_logger:info_report(Packet),
+			case queue:out(State#state.linkers) of
+				{{ value, Pid }, Linkers } ->
+					Linkers1 = queue:in(Pid, Linkers),
+					Pid ! { packet, Packet },
+					{ NewState0#state{ linkers = Linkers1 }, Is_exit0};
+				{ empty, _Linkers } -> { NewState0, Is_exit0 }
+			end;
+		{ error, timeout} -> { NewState0, Is_exit0 }
+	end,
+	case Is_exit1 of
+		true -> ok;
+		_ -> loop(NewState1)
+	end.
 
-% Прием сообщений и преобразование их в сообщения для gen_server
-socket_loop(Pid, Socket) ->
-	inet:setopts(Socket,[{active,once}]),
+do_event(State) ->
 	receive
-		{ udp, Socket, Bin } ->
-			Counters = binary:split(Bin, [ <<9>>, <<10>>, <<13>> ]),
-			lists:map(fun(Counter) ->
-				[ Key, Step | Other ] = binary:split(Counter, [ <<" ">> ])
-				ok = gen_server:cast(Pid, { step, Key, Value })
-			end
-			send_server(Socket, Pid, {get, trim(Section)}),
-			socket_loop(Pid, Socket);
-		{udp_closed, Socket } -> ok
-	end
-.
+		stop ->
+			{ State , true };
+		{ reload_queue , Linkers } ->
+			{State#state{ linkers = Linkers }, none }
+	after 0 ->
+		{ State, none }
+	end.
 
-handle_call({ step, Key, Value }, State) ->
-	Pid = element(erlang:hash(Key, tuple_size(State#state.tables)), State#state.tables)
-	ectable:step(Pid, Key, lists:list_to_integer(binary:binary_to_list(Value))),
-	{ noreply, State }
-.
+stop(Pid) ->
+	Pid ! stop.
 
-terminate(Reason, _State) ->
-	error_logger:info_report({ tcp_server_terminate, Reason}),
-	ok.
-
-handle_cast({ accept, _Socket } , State) -> {noreply, State};
-
-handle_cast( _ , State) ->
-	{noreply, State}.
-
-handle_info( _ , State) ->
-	{noreply, State}.
-
-code_change(_OldVsn, State, _Extra) -> { ok, State }.
-
+reload(Pid, Linkers) ->
+	Pid ! { reload_queue, Linkers }.
 
