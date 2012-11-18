@@ -8,11 +8,12 @@
 
 init({Server_pid, Count, Count_ectables}) ->
 	Childspec = lists:map(fun(Item) ->
-		Name = { Server_pid, Item },
-		{ Name , { ecserver, start_link, [ Server_pid, Item ,  Count_ectables ] }, transient, ?RESTART_TIME, worker, [ ecserver, ecserver_sup ]}
-	end, lists:seq(1,Count)),
-	{ok , {{simple_one_for_one, 5, 500}, Childspec }}.
+		{ Item , { ecserver, start_link, [ Server_pid, Item ,  Count_ectables ] }, transient, ?RESTART_TIME, worker, [ ecserver, ecserver_sup ]}
+		end, lists:seq(1,Count)),
+	{ok , {{one_for_one, 5, 500}, Childspec }}.
 
 start_link(Server_pid, Count, Count_ectables) ->
 	supervisor:start_link(?MODULE, { Server_pid, Count, Count_ectables }).
+
+
 

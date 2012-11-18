@@ -1,6 +1,5 @@
 -module(udp_server).
--export([init/3, start/3, stop/1]).
-
+-export([init/3, start/3, stop/1, loop/1]).
 
 -record(state, {
 	server_pid :: pid(),
@@ -14,6 +13,7 @@ start(Port, Server_pid, Count_ecserver) ->
 	{ok , spawn_link(?MODULE, init, [Port, Server_pid, Count_ecserver]) }.
 
 init(Port, Server_pid, Count_ecserver) ->
+	error_logger:info_report({udp_server, Port}),
 	{ok, Socket} = gen_udp:open(Port, [ binary, { active, false} ] ),
 	loop(#state{
 		server_pid = Server_pid,

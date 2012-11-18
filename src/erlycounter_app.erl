@@ -10,11 +10,19 @@ start() ->
 
 -define(ECSERVER_COUNT, 5).
 -define(ECTABLE_COUNT, 5).
-start(_Type, StartArgs) ->
-	{ok, _Pid_ectable_sup} = ectable_sup:start_link(self(), ?ECTABLE_COUNT, 30000, <<"ls">>),
-	{ok, _Pid_ecserver_sup} = ecserver_sup:start_link(self(), ?ECSERVER_COUNT, ?ECTABLE_COUNT),
-	{ok, _Pid_udp_server} = udp_server_sup:start_link(self(), 29829, 29830).
+start(_Type, _StartArgs) ->
+	application:start(gproc),
+	error_logger:logfile({open, "erlycounter.log"}),
+	error_logger:tty(true),
 
+	Pid = spawn_link(fun() ->
+		error_logger:info_report({start_ectable, ectable_sup:start_link(self(), ?ECTABLE_COUNT, 10000, <<"cat > 1.log">>)}),
+		error_logger:info_report({start_ecserver, ecserver_sup:start_link(self(), ?ECSERVER_COUNT, ?ECTABLE_COUNT)}),
+		error_logger:info_report({start_udp_server, udp_server_sup:start_link(self(), ?ECSERVER_COUNT, 29829, 29830)}),
+		loop()
+	end),
+	{ok, Pid}
+.
 
 %%----------------------------------------------------------------------
 %% Func: stop/1
@@ -22,4 +30,12 @@ start(_Type, StartArgs) ->
 %%----------------------------------------------------------------------
 stop(_State) ->
     ok.
+
+loop() ->
+	receive
+		_ -> ?MODULE:loop()
+	end
+.
+
+
 

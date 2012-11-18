@@ -12,6 +12,7 @@
 }).
 
 init({Server_pid, Number, Count_ectables}) ->
+	error_logger:info_report({ecserver_open, Number}),
 	gproc:add_local_name({ecserver, Server_pid, Number}),
 	{ok, #state{
 		server_pid = Server_pid,
@@ -19,7 +20,10 @@ init({Server_pid, Number, Count_ectables}) ->
 	}}.
 
 start_link(Server_pid, Number, Count_ectables) ->
-	gen_server:start_link(?MODULE, {Server_pid, Number, Count_ectables}).
+	%X = {ok, spawn_link(fun() -> receive _ -> 0 end end)},
+	X = gen_server:start_link(?MODULE, {Server_pid, Number, Count_ectables}, []),
+	error_logger:info_report(X),
+	X.
 
 pid(Server_pid, Number) ->
 	gproc:lookup_local_name({ecserver, Server_pid, Number}).
@@ -31,16 +35,17 @@ handle_cast({packet, Packet }, State) ->
 	lists:map(fun(Pair) ->
 		case binary:split(Pair, <<" ">>, [global, trim] ) of
 			[ Key, Value | _ ] ->
-				List = binary:binary_to_list(Value),
+				List = binary:bin_to_list(Value),
 				try list_to_integer(List) of
 					A -> send(State, Key, A)
 				catch
-					badarg: _ ->
-						try list_to_float(List) of
-							B -> send(State, Key, B)
-						catch
-							badarg: _ -> 0
-						end
+					error:_ -> 0
+						% Float счетчик пока не предусмотрен
+						%try list_to_float(List) of
+						%	B -> send(State, Key, B)
+						%catch
+						%	{badarg, _ } -> 0
+						%end
 				end,
 				ok;
 			_ -> ok
@@ -59,6 +64,7 @@ code_change(_OldVsn, State, _Extra) -> { ok, State }.
 terminate(_Reason, _State) -> ok.
 
 send(State, Key, Value) ->
+	error_logger:info_report({send_counter, Key, Value}),
 	[ Subkey | _ ]  = binary:split(Key, <<"@">> ),
 	Number = erlang:phash(Subkey, State#state.count),
 	Pid = ectable:pid(State#state.server_pid, Number),

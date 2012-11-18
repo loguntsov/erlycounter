@@ -11,9 +11,8 @@
 }).
 
 save(Ets,Command) ->
-	Pid = gen_server:start_link(?MODULE, { self() }, []),
+	{ok , Pid } = gen_server:start_link(?MODULE, { self() }, []),
 	ets:give_away(Ets, Pid, { cast, Command } ).
-
 
 init({Owner_pid}) ->
 	{ ok ,
@@ -23,7 +22,7 @@ init({Owner_pid}) ->
 	}
 .
 
-handle_info( {'ETS-TRANSFER', Ets , Owner_pid, { _Method, Command }}, State) when Owner_pid == State#state.owner_pid ->
+handle_info( {'ETS-TRANSFER', Ets , Owner_pid, { cast, Command }}, State) when Owner_pid == State#state.owner_pid ->
 	do_save(Ets, Command),
 	{stop, normal, State};
 
@@ -43,9 +42,10 @@ do_save(Ets, Command) ->
 do_save(_Ets, _Command, 0) -> ok;
 
 do_save(Ets, Command, Size) when Size > 0 ->
-	Port = erlang:open_port({spawn, Command}, [ stream, use_stdio, binary ]),
+	error_logger:info_report({ets_save, Ets, Size, Command}),
+	Port = erlang:open_port({spawn, binary_to_list(Command)}, [ stream, use_stdio, binary ]),
 	ok = ets:foldl(fun( { Key, Value } , _Text ) ->
-		Val = binary:list_to_binary(integer_to_list(Value)),
+		Val = list_to_binary(integer_to_list(Value)),
 		true = port_command(Port, <<Key/binary, 32 , Val/binary,  10 >>),
 		ok
 	end, none, Ets),

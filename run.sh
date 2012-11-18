@@ -1,4 +1,4 @@
 #!/bin/sh
+rebar clean
 rebar compile
-erl -pa ebin -pa deps/*/ebin \
-	-eval "io:format(\"~nVKTema redirect by UID~n\")."
+erl -pa ebin deps/*/ebin 
