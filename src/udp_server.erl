@@ -1,60 +1,59 @@
 -module(udp_server).
--export([init/2, start/2, stop/1, reload/2]).
+-export([init/3, start/3, stop/1]).
 
 
 -record(state, {
-	linkers :: queue(), % PID-линкеров, которые решают, куда слать данные
+	server_pid :: pid(),
+	count_ecserver :: integer(),
+	current_ecserver :: integer(),
 	port :: integer(),
-	socket :: port(),
-	owner_pid :: pid()
+	socket :: port()
 }).
 
-start(Owner_pid, Port) ->
-	{ok , spawn_link(?MODULE, init, [Owner_pid, Port]) }.
+start(Port, Server_pid, Count_ecserver) ->
+	{ok , spawn_link(?MODULE, init, [Port, Server_pid, Count_ecserver]) }.
 
-init(Owner_pid, Port) ->
+init(Port, Server_pid, Count_ecserver) ->
 	{ok, Socket} = gen_udp:open(Port, [ binary, { active, false} ] ),
-	udp_server_sup:event_child_start(Owner_pid),
 	loop(#state{
-		linkers = queue:from_list([ ]),
+		server_pid = Server_pid,
+		count_ecserver = Count_ecserver,
+		current_ecserver = 1,
 		port = Port,
-		socket = Socket,
-		owner_pid = Owner_pid
+		socket = Socket
 	}).
 
 loop(State) ->
 	Data = gen_udp:recv(State#state.socket, 0, 100),
 	{ NewState0, Is_exit0 } = do_event(State),
-	{ NewState1, Is_exit1 } = case Data of
+	NewState1 = case Data of
 		{ok, { _Address, _Port, Packet } } ->
 			error_logger:info_report(Packet),
-			case queue:out(State#state.linkers) of
-				{{ value, Pid }, Linkers } ->
-					Linkers1 = queue:in(Pid, Linkers),
-					Pid ! { packet, Packet },
-					{ NewState0#state{ linkers = Linkers1 }, Is_exit0};
-				{ empty, _Linkers } -> { NewState0, Is_exit0 }
-			end;
-		{ error, timeout} -> { NewState0, Is_exit0 }
+			Ecserver = get_next_current_ecserver(NewState0),
+			Pid = ecserver:pid(State#state.server_pid, Ecserver),
+			ecserver:packet(Pid, Packet),
+			NewState0#state{current_ecserver = Ecserver };
+		{ error, timeout} -> NewState0
 	end,
-	case Is_exit1 of
+	case Is_exit0 of
 		true -> ok;
-		_ -> loop(NewState1)
+		_ -> ?MODULE:loop(NewState1)
+	end.
+
+get_next_current_ecserver(State) ->
+	if
+		State#state.current_ecserver >= State#state.count_ecserver -> 1;
+		true -> State#state.current_ecserver + 1
 	end.
 
 do_event(State) ->
 	receive
 		stop ->
-			{ State , true };
-		{ reload_queue , Linkers } ->
-			{State#state{ linkers = Linkers }, none }
+			{ State , true }
 	after 0 ->
 		{ State, none }
 	end.
 
 stop(Pid) ->
 	Pid ! stop.
-
-reload(Pid, Linkers) ->
-	Pid ! { reload_queue, Linkers }.
 

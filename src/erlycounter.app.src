@@ -6,7 +6,7 @@
     {applications, [
         kernel,
         stdlib,
-	inets
+		inets
     ]},
     {modules, { erlycounter, [ udp_server, udp_server_sup ]}},
     {env, []}
