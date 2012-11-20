@@ -1,13 +1,15 @@
 %% Copyright
 {application, erlycounter, [
+	{mod, { erlycounter_app, [ ]}},
     {description, ""},
     {vsn, "1"},
     {registered, []},
     {applications, [
         kernel,
         stdlib,
+        lager,
         gproc
     ]},
-    {modules, { erlycounter, [ udp_server, udp_server_sup ]}},
+    {modules, { erlycounter, [  ]}},
     {env, []}
 ]}.

@@ -1,5 +1,5 @@
 -module(udp_server).
--export([init/3, start/3, stop/1, loop/1]).
+-export([init/3, start_link/3, stop/1, loop/1]).
 
 -record(state, {
 	server_pid :: pid(),
@@ -9,19 +9,24 @@
 	socket :: port()
 }).
 
-start(Port, Server_pid, Count_ecserver) ->
+start_link(Port, Server_pid, Count_ecserver) ->
 	{ok , spawn_link(?MODULE, init, [Port, Server_pid, Count_ecserver]) }.
 
 init(Port, Server_pid, Count_ecserver) ->
-	error_logger:info_report({udp_server, Port}),
-	{ok, Socket} = gen_udp:open(Port, [ binary, { active, false} ] ),
-	loop(#state{
-		server_pid = Server_pid,
-		count_ecserver = Count_ecserver,
-		current_ecserver = 1,
-		port = Port,
-		socket = Socket
-	}).
+	io:format("~w",[hello]),
+	case gen_udp:open(Port, [ binary, { active, false} ] ) of
+		{ok, Socket} ->
+			error_logger:info_report({udp_server, self(), Port}),
+			loop(#state{
+				server_pid = Server_pid,
+				count_ecserver = Count_ecserver,
+				current_ecserver = 1,
+				port = Port,
+				socket = Socket
+			});
+		Error ->
+			io:format("~w",Error)
+	end.
 
 loop(State) ->
 	Data = gen_udp:recv(State#state.socket, 0, 100),

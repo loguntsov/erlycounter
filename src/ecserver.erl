@@ -12,6 +12,7 @@
 }).
 
 init({Server_pid, Number, Count_ectables}) ->
+	process_flag(trap_exit, true),
 	error_logger:info_report({ecserver_open, Number}),
 	gproc:add_local_name({ecserver, Server_pid, Number}),
 	{ok, #state{
@@ -61,7 +62,9 @@ handle_info( _, State) -> {noreply, State}.
 
 code_change(_OldVsn, State, _Extra) -> { ok, State }.
 
-terminate(_Reason, _State) -> ok.
+terminate(Reason, _State) ->
+	io:format("~w",[{?MODULE, terminate, Reason, self()}]),
+ok.
 
 send(State, Key, Value) ->
 	error_logger:info_report({send_counter, Key, Value}),

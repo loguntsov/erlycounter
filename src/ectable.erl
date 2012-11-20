@@ -50,8 +50,7 @@ handle_cast(stop, State) ->
 	{ stop, normal, State };
 
 handle_cast(save, State) ->
-	NewState = do_save(State),
-	{ noreply, NewState };
+	{ noreply, do_save(State) };
 
 handle_cast({step, _Key, 0}, State) -> { noreply, State };
 
@@ -83,8 +82,6 @@ handle_info(tick, State) ->
 
 handle_call( _ , _ , State) -> { noreply, State }.
 
-
-
 code_change(_OldVsn, State, _Extra) -> { ok, State }.
 
 terminate(_Reason, _State) -> ok.
@@ -93,7 +90,13 @@ tick_after(Time) ->
 	{ ok, _TRef } = timer:send_after(Time, tick).
 
 do_save(State) ->
-	ecsaver:save(State#state.ets, State#state.command),
-	State#state{ ets = ets_new() }
+	Size = ets:info(State#state.ets, size),
+	if
+		Size > 0 ->
+			case ecsaver:save(State#state.ets, State#state.command) of
+				true -> State#state{ ets = ets_new() };
+				false -> State
+			end;
+		true -> State
+	end
 .
-

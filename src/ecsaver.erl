@@ -5,26 +5,48 @@
 -behaviour(gen_server).
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, code_change/3,terminate/2]).
+-export([pool_start/1]).
+
+-behaviour(poolboy_worker).
+
+-export([start_link/1]).
 
 -record(state, {
-	owner_pid :: pid()
+
 }).
 
+
+pool_start(Count) ->
+	io:format("Start poolboy ~w",[Count]),
+	Value = poolboy:start_link([
+		{name, {local, ecsaver_pool }},
+		{size, Count},
+		{max_overflow, Count},
+		{worker_module, ecsaver}
+		], []),
+	io:format("Poolboy started ~w",[Value]),
+	Value.
+
 save(Ets,Command) ->
-	{ok , Pid } = gen_server:start_link(?MODULE, { self() }, []),
-	ets:give_away(Ets, Pid, { cast, Command } ).
+	case poolboy:checkout(ecsaver_pool, false) of
+		full -> false;
+		Worker ->
+			ets:give_away(Ets, Worker, { cast, Command } ),
+			true
+	end.
 
-init({Owner_pid}) ->
-	{ ok ,
-		#state{
-			owner_pid = Owner_pid
-		}
-	}
-.
+start_link(Arg) ->
+	Value = gen_server:start_link(?MODULE, Arg, []),
+	io:format("ecsaver start ~w",[Value]),
+	Value.
 
-handle_info( {'ETS-TRANSFER', Ets , Owner_pid, { cast, Command }}, State) when Owner_pid == State#state.owner_pid ->
+init(_State) ->
+	process_flag(trap_exit, true),
+	{ ok , {} }.
+
+handle_info( {'ETS-TRANSFER', Ets , _From, { cast, Command }}, State) ->
 	do_save(Ets, Command),
-	{stop, normal, State};
+	{noreply, State};
 
 handle_info( _, State) -> {noreply, State}.
 
@@ -34,7 +56,9 @@ handle_call( _, _, State) -> {noreply, State}.
 
 code_change(_OldVsn, State, _Extra) -> { ok, State }.
 
-terminate(_Reason, _State) -> ok.
+terminate(Reason, _State) ->
+	io:format("ecsaver terminate ~w",[{Reason, self()}]),
+ok.
 
 do_save(Ets, Command) ->
 	do_save(Ets,Command, ets:info(Ets, size)).
@@ -50,4 +74,5 @@ do_save(Ets, Command, Size) when Size > 0 ->
 		ok
 	end, none, Ets),
 	port_close(Port),
+	poolboy:checkin(ecsaver_pool, self()),
 	ok.
