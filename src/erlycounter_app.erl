@@ -10,23 +10,21 @@
 -export([init/1]).
 
 start() ->
-	lager:start(),
 	application:start(gproc),
-	ok = application:start(erlycounter),
+	application:start(erlycounter),
 	ok.
 
 start(_Type, _StartArgs) ->
 	{ok, [Options]} = file:consult("erlycounter.conf"),
 	{ok, Pid} = supervisor:start_link(?MODULE, Options),
+	io:format("Erlycounter started"),
 	{ok, Pid}.
 
 %%----------------------------------------------------------------------
 %% Func: stop/1
 %% Returns: any
 %%----------------------------------------------------------------------
-stop(State) ->
-	error_logger:info_report({shutdown, State}),
-    ok.
+stop(_State) -> ok.
 
 init(Options) ->
 	{tables, Tables} = proplists:lookup(tables, Options), % integer

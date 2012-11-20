@@ -12,8 +12,6 @@
 }).
 
 init({Server_pid, Number, Count_ectables}) ->
-	process_flag(trap_exit, true),
-	error_logger:info_report({ecserver_open, Number}),
 	gproc:add_local_name({ecserver, Server_pid, Number}),
 	{ok, #state{
 		server_pid = Server_pid,
@@ -21,10 +19,8 @@ init({Server_pid, Number, Count_ectables}) ->
 	}}.
 
 start_link(Server_pid, Number, Count_ectables) ->
-	%X = {ok, spawn_link(fun() -> receive _ -> 0 end end)},
-	X = gen_server:start_link(?MODULE, {Server_pid, Number, Count_ectables}, []),
-	error_logger:info_report(X),
-	X.
+	gen_server:start_link(?MODULE, {Server_pid, Number, Count_ectables}, []).
+
 
 pid(Server_pid, Number) ->
 	gproc:lookup_local_name({ecserver, Server_pid, Number}).
@@ -62,12 +58,9 @@ handle_info( _, State) -> {noreply, State}.
 
 code_change(_OldVsn, State, _Extra) -> { ok, State }.
 
-terminate(Reason, _State) ->
-	io:format("~w",[{?MODULE, terminate, Reason, self()}]),
-ok.
+terminate(_Reason, _State) -> ok.
 
 send(State, Key, Value) ->
-	error_logger:info_report({send_counter, Key, Value}),
 	[ Subkey | _ ]  = binary:split(Key, <<"@">> ),
 	Number = erlang:phash(Subkey, State#state.count),
 	Pid = ectable:pid(State#state.server_pid, Number),

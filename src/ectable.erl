@@ -17,7 +17,6 @@ start_link( Server_pid, Number, Tick, Command ) ->
 	gen_server:start_link(?MODULE, {Server_pid, Number, Tick, Command}, []).
 
 init({Server_pid, Number, Tick, Command}) ->
-	error_logger:info_report({ectable_server_open, Number}),
 	gproc:add_local_name({ectable, Server_pid, Number}),
 	Ets = ets_new(),
 	tick_after(random:uniform(Tick)),
@@ -54,22 +53,20 @@ handle_cast(save, State) ->
 
 handle_cast({step, _Key, 0}, State) -> { noreply, State };
 
+handle_cast({step, Key, Step}, State) when Step < 0 ->
+	try (ets:update_counter(State#state.ets, Key, {2, Step, 0,0})) of
+		A -> A
+	catch
+		error: _ -> 0
+	end,
+	{ noreply, State };
+
 handle_cast({step, Key, Step}, State) ->
-	error_logger:info_report({increment, Key, Step}),
-	if
-		Step < 0 ->
-			try (ets:update_counter(State#state.ets, Key, {2, Step, 0,0})) of
-				A -> A
-			catch
-				error: _ -> 0
-			end;
-		true ->
-			try (ets:update_counter(State#state.ets, Key, {2, Step})) of
-				A -> A
-			catch
-				error: _ ->
-					ets:insert(State#state.ets, { Key, Step })
-			end
+	try (ets:update_counter(State#state.ets, Key, {2, Step})) of
+		A -> A
+	catch
+		error: _ ->
+			ets:insert(State#state.ets, { Key, Step })
 	end,
 	{ noreply, State };
 

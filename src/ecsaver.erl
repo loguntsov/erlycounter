@@ -11,21 +11,13 @@
 
 -export([start_link/1]).
 
--record(state, {
-
-}).
-
-
 pool_start(Count) ->
-	io:format("Start poolboy ~w",[Count]),
-	Value = poolboy:start_link([
+	poolboy:start_link([
 		{name, {local, ecsaver_pool }},
 		{size, Count},
 		{max_overflow, Count},
 		{worker_module, ecsaver}
-		], []),
-	io:format("Poolboy started ~w",[Value]),
-	Value.
+		], []).
 
 save(Ets,Command) ->
 	case poolboy:checkout(ecsaver_pool, false) of
@@ -36,12 +28,9 @@ save(Ets,Command) ->
 	end.
 
 start_link(Arg) ->
-	Value = gen_server:start_link(?MODULE, Arg, []),
-	io:format("ecsaver start ~w",[Value]),
-	Value.
+	gen_server:start_link(?MODULE, Arg, []).
 
 init(_State) ->
-	process_flag(trap_exit, true),
 	{ ok , {} }.
 
 handle_info( {'ETS-TRANSFER', Ets , _From, { cast, Command }}, State) ->
@@ -56,9 +45,7 @@ handle_call( _, _, State) -> {noreply, State}.
 
 code_change(_OldVsn, State, _Extra) -> { ok, State }.
 
-terminate(Reason, _State) ->
-	io:format("ecsaver terminate ~w",[{Reason, self()}]),
-ok.
+terminate(_Reason, _State) -> ok.
 
 do_save(Ets, Command) ->
 	do_save(Ets,Command, ets:info(Ets, size)).
@@ -66,7 +53,6 @@ do_save(Ets, Command) ->
 do_save(_Ets, _Command, 0) -> ok;
 
 do_save(Ets, Command, Size) when Size > 0 ->
-	error_logger:info_report({ets_save, Ets, Size, Command}),
 	Port = erlang:open_port({spawn, binary_to_list(Command)}, [ stream, use_stdio, binary ]),
 	ok = ets:foldl(fun( { Key, Value } , _Text ) ->
 		Val = list_to_binary(integer_to_list(Value)),

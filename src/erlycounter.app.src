@@ -7,7 +7,6 @@
     {applications, [
         kernel,
         stdlib,
-        lager,
         gproc
     ]},
     {modules, { erlycounter, [  ]}},
