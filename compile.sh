@@ -1,3 +1,3 @@
 #!/bin/bash
-rebar clean
-rebar compile
+./rebar clean
+./rebar compile
