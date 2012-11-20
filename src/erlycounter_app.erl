@@ -9,26 +9,15 @@
 
 -export([init/1]).
 
--define(ECSERVER_COUNT, 5).
--define(ECTABLE_COUNT, 5).
-
 start() ->
 	lager:start(),
 	application:start(gproc),
-	error_logger:logfile({open, 'erlycounter.log'}),
-    error_logger:tty(true),
-%	dbg:tracer(),
-%	dbg:p(new, [m, c, sos]),
 	ok = application:start(erlycounter),
-	error_logger:info_report({application_pid,self()}),
-	ok
-.
+	ok.
 
 start(_Type, _StartArgs) ->
 	{ok, [Options]} = file:consult("erlycounter.conf"),
-	io:format("~w",[Options]),
 	{ok, Pid} = supervisor:start_link(?MODULE, Options),
-	error_logger:info_report({application_supervisor,Pid}),
 	{ok, Pid}.
 
 %%----------------------------------------------------------------------
