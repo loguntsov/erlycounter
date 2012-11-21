@@ -2,3 +2,4 @@
 *.beam
 *.log
 erl_crash.dump
+erlycounter.conf
