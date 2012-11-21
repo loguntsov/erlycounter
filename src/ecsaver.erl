@@ -60,5 +60,6 @@ do_save(Ets, Command, Size) when Size > 0 ->
 		ok
 	end, none, Ets),
 	port_close(Port),
+	ets:delete(Ets),
 	poolboy:checkin(ecsaver_pool, self()),
 	ok.
