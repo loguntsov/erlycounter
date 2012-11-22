@@ -54,12 +54,15 @@ do_save(_Ets, _Command, 0) -> ok;
 
 do_save(Ets, Command, Size) when Size > 0 ->
 	Port = erlang:open_port({spawn, binary_to_list(Command)}, [ stream, use_stdio, binary ]),
+	Ordered_ets = ets:new(none, [ ordered_set, private ]),
+	ets:insert(Ordered_ets, ets:tab2list(Ets)),
+	ets:delete(Ets),
 	ok = ets:foldl(fun( { Key, Value } , _Text ) ->
 		Val = list_to_binary(integer_to_list(Value)),
 		true = port_command(Port, <<Key/binary, 32 , Val/binary,  10 >>),
 		ok
-	end, none, Ets),
+	end, none, Ordered_ets),
 	port_close(Port),
-	ets:delete(Ets),
+	ets:delete(Ordered_ets),
 	poolboy:checkin(ecsaver_pool, self()),
 	ok.
